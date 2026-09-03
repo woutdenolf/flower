@@ -406,4 +406,4 @@ class TasksTimeZoneTest(AsyncHTTPTestCase):
         r = self.get('/tasks')
         self.assertEqual(200, r.code)
         body = r.body.decode()
-        self.assertIn('time', body)
+        self.assertIn('value="time"', body)
