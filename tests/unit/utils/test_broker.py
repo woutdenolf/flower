@@ -4,7 +4,8 @@ from unittest.mock import MagicMock
 
 from flower.utils import broker
 from flower.utils.broker import (Broker, RabbitMQ, Redis, RedisBase,
-                                 RedisSentinel, RedisSocket, RedisSsl)
+                                 RedisSentinel, RedisSocket, RedisSsl,
+                                 validate_broker_api)
 
 broker.requests = MagicMock()
 broker.redis = MagicMock()
@@ -52,9 +53,19 @@ class TestRabbitMQ(unittest.TestCase):
             self.assertEqual(None, b.password)
 
     def test_invalid_http_api(self):
-        with self.assertLogs('', level='ERROR') as cm:
-            RabbitMQ('amqp://user:pass@host:10000/vhost', http_api='ftp://')
-            self.assertEqual(['ERROR:flower.utils.broker:Invalid broker api url: ftp://'], cm.output)
+        for http_api in ['ftp://guest:guest@host:15672/api/', 'http://']:
+            with self.assertRaises(ValueError):
+                validate_broker_api(http_api)
+
+    def test_valid_http_api(self):
+        for http_api in ['http://guest:guest@host:15672/api/',
+                         'https://rabbit.internal:15671/api/']:
+            validate_broker_api(http_api)
+
+    def test_invalid_http_api_does_not_leak_password(self):
+        with self.assertRaises(ValueError) as cm:
+            validate_broker_api('ftp://guest:s3cr3t@host:15672/api/')
+        self.assertNotIn('s3cr3t', str(cm.exception))
 
     def test_verifies_cert_by_default(self):
         b = RabbitMQ('amqps://user:pass@host:15672/vhost', '')

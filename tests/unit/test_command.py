@@ -9,7 +9,8 @@ import celery
 from prometheus_client import Histogram
 from tornado.options import options
 
-from flower.command import (apply_env_options, apply_options, print_banner,
+from flower.command import (apply_env_options, apply_options, extract_settings,
+                            print_banner,
                             warn_about_celery_args_used_in_flower_command)
 from tests.unit import AsyncHTTPTestCase
 
@@ -41,6 +42,19 @@ class TestFlowerCommand(AsyncHTTPTestCase):
         with self.mock_option('address', '127.0.0.1'):
             apply_options('flower', argv=['--address=foo'])
             self.assertEqual('foo', options.address)
+
+    def test_invalid_broker_api_exits(self):
+        for broker_api in ['ftp://guest:s3cr3t@rabbit:15672/api/', 'http://']:
+            with self.mock_option('broker_api', broker_api):
+                with self.assertRaises(SystemExit) as cm:
+                    extract_settings()
+                self.assertEqual(1, cm.exception.code)
+
+    def test_valid_broker_api_accepted(self):
+        for broker_api in ['http://guest:guest@localhost:15672/api/',
+                           'https://rabbit.internal:15671/api/']:
+            with self.mock_option('broker_api', broker_api):
+                extract_settings()
 
     def test_auto_refresh(self):
         with patch.dict(os.environ, {"FLOWER_AUTO_REFRESH": "false"}):

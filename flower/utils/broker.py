@@ -20,6 +20,16 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def validate_broker_api(http_api):
+    "raise ValueError if the management API url is invalid"
+    url = urlparse(http_api)
+    if url.scheme not in ('http', 'https'):
+        raise ValueError(
+            f"invalid scheme {url.scheme!r}, expected 'http' or 'https'")
+    if not url.netloc:
+        raise ValueError('no host in url')
+
+
 class BrokerBase:
     def __init__(self, broker_url, *_, **__):
         purl = urlparse(broker_url)
@@ -51,11 +61,6 @@ class RabbitMQ(BrokerBase):
 
         if not http_api:
             http_api = f"http://{self.username}:{self.password}@{self.host}:{self.port}/api/{self.vhost}"
-
-        try:
-            self.validate_http_api(http_api)
-        except ValueError:
-            logger.error("Invalid broker api url: %s", http_api)
 
         self.http_api = http_api
 
@@ -92,12 +97,6 @@ class RabbitMQ(BrokerBase):
             if ca_certs:
                 return {'validate_cert': True, 'ca_certs': ca_certs}
         return {'validate_cert': True}
-
-    @classmethod
-    def validate_http_api(cls, http_api):
-        url = urlparse(http_api)
-        if url.scheme not in ('http', 'https'):
-            raise ValueError(f"Invalid http api schema: {url.scheme}")
 
 
 class RedisBase(BrokerBase):
