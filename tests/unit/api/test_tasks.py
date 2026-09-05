@@ -154,6 +154,23 @@ class TaskResultTests(BaseApiTestCase):
         self.assertEqual(503, r.code)
 
 
+class TaskResultInvalidTimeoutTests(BaseApiTestCase):
+    def test_invalid_timeout(self):
+        r = self.get('/api/task/result/123?timeout=abc')
+
+        self.assertEqual(400, r.code)
+        self.assertIn('Invalid argument', r.body.decode('utf-8'))
+
+
+class QueueLengthsTests(BaseApiTestCase):
+    @patch('flower.api.tasks.Broker', side_effect=NotImplementedError)
+    def test_unsupported_broker(self, _broker):
+        r = self.get('/api/queues/length')
+
+        self.assertEqual(404, r.code)
+        self.assertIn('broker is not supported', r.body.decode('utf-8'))
+
+
 class TaskAbortTests(BaseApiTestCase):
     @patch('flower.api.tasks.AbortableAsyncResult')
     def test_backend_connection_failure_returns_service_unavailable(
@@ -296,6 +313,28 @@ class TaskTests(BaseApiTestCase):
         self.assertEqual(1, len(table))
         firstFetchedTaskName = table[list(table)[0]]['name']
         self.assertEqual("task1", firstFetchedTaskName)
+
+    def test_invalid_sort_by(self):
+        r = self.get('/api/tasks?sort_by=bogus')
+
+        self.assertEqual(400, r.code)
+        self.assertIn('Invalid sort_by', r.body.decode('utf-8'))
+
+    def test_valid_sort_by_descending(self):
+        r = self.get('/api/tasks?sort_by=-received')
+
+        self.assertEqual(200, r.code)
+
+    def test_invalid_limit(self):
+        r = self.get('/api/tasks?limit=xyz')
+
+        self.assertEqual(400, r.code)
+
+    def test_invalid_received_start(self):
+        r = self.get('/api/tasks?received_start=garbage')
+
+        self.assertEqual(400, r.code)
+        self.assertIn('received_start', r.body.decode('utf-8'))
 
     def test_invalid_search(self):
         r = self.get('/api/tasks?search=ab')

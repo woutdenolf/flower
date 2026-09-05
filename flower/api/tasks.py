@@ -52,9 +52,6 @@ class BaseTaskHandler(BaseApiHandler):
     def result_state(result):
         return result.state
 
-    def write_error(self, status_code, **kwargs):
-        self.set_status(status_code)
-
     def update_response_result(self, response, result):
         if result.state == states.FAILURE:
             response.update({'result': self.safe_result(result.result),
@@ -337,11 +334,11 @@ Get a task result
 :query timeout: how long to wait, in seconds, before the operation times out
 :reqheader Authorization: optional OAuth token to authenticate
 :statuscode 200: no error
+:statuscode 400: invalid timeout
 :statuscode 401: unauthorized request
 :statuscode 503: result backend is not configured
         """
-        timeout = self.get_argument('timeout', None)
-        timeout = float(timeout) if timeout is not None else None
+        timeout = self.get_argument('timeout', None, type=float)
 
         result = AsyncResult(taskid)
         if not self.backend_configured(result):
@@ -439,7 +436,7 @@ Return length of all active queues
 :reqheader Authorization: optional OAuth token to authenticate
 :statuscode 200: no error
 :statuscode 401: unauthorized request
-:statuscode 503: result backend is not configured
+:statuscode 404: broker is not supported
         """
         app = self.application
 
@@ -447,9 +444,13 @@ Return length of all active queues
         if app.transport == 'amqp' and app.options.broker_api:
             http_api = app.options.broker_api
 
-        broker = Broker(app.broker_uri_with_password,
-                        http_api=http_api, broker_options=self.capp.conf.broker_transport_options,
-                        broker_use_ssl=self.capp.conf.broker_use_ssl)
+        try:
+            broker = Broker(app.broker_uri_with_password,
+                            http_api=http_api, broker_options=self.capp.conf.broker_transport_options,
+                            broker_use_ssl=self.capp.conf.broker_use_ssl)
+        except NotImplementedError as exc:
+            raise HTTPError(
+                404, f"'{app.transport}' broker is not supported") from exc
 
         queues = await broker.queues(self.get_active_queue_names())
         self.write({'active_queues': queues})
@@ -548,11 +549,11 @@ List tasks
 :query search: search task details using the task-filter query syntax
 :reqheader Authorization: optional OAuth token to authenticate
 :statuscode 200: no error
-:statuscode 400: invalid search query
+:statuscode 400: invalid query parameters
 :statuscode 401: unauthorized request
         """
         app = self.application
-        limit = self.get_argument('limit', None)
+        limit = self.get_argument('limit', None, type=int)
         offset = self.get_argument('offset', default=0, type=int)
         worker = self.get_argument('workername', None)
         type = self.get_argument('taskname', None)
@@ -562,11 +563,16 @@ List tasks
         sort_by = self.get_argument('sort_by', None)
         search = self.get_argument('search', None)
 
-        limit = limit and int(limit)
         offset = max(offset, 0)
         worker = worker if worker != 'All' else None
         type = type if type != 'All' else None
         state = state if state != 'All' else None
+
+        if sort_by and sort_by.lstrip('-') not in tasks.SORT_KEYS:
+            raise HTTPError(
+                400,
+                f"Invalid sort_by '{sort_by}', expected one of "
+                f"{', '.join(sorted(tasks.SORT_KEYS))}")
 
         result = []
         try:
@@ -587,6 +593,10 @@ List tasks
             self.set_status(400)
             self.write({'error': str(exc)})
             return
+        except ValueError as exc:
+            raise HTTPError(
+                400, "Invalid received_start or received_end, "
+                "expected format 'YYYY-MM-DD HH:MM'") from exc
         self.write(OrderedDict(result))
 
 
