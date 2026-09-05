@@ -558,5 +558,5 @@ When read only mode is enabled, Flower will not allow any control operations to 
 
 Example::
 
-    $ celery flower --read_only
+    $ celery flower --read-only
 
