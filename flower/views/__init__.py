@@ -3,6 +3,7 @@ import traceback
 import copy
 import logging
 import hmac
+import os
 
 from base64 import b64decode
 from urllib.parse import urlparse
@@ -17,9 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 class BaseHandler(tornado.web.RequestHandler):
+    @property
+    def unauthenticated_api(self):
+        return strtobool(os.environ.get('FLOWER_UNAUTHENTICATED_API') or 'false')
+
     def set_default_headers(self):
         self.set_header('X-Content-Type-Options', 'nosniff')
-        if not (self.application.options.basic_auth or self.application.options.auth):
+        options = self.application.options
+        # Cross-origin reads are only for instances explicitly opened to unauthenticated clients
+        if not (options.basic_auth or options.auth) and self.unauthenticated_api:
             self.set_header("Access-Control-Allow-Origin", "*")
             self.set_header("Access-Control-Allow-Headers",
                             "x-requested-with,access-control-allow-origin,authorization,content-type")
