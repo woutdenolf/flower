@@ -1,8 +1,28 @@
 from types import SimpleNamespace
 
-from flower.views.auth import (authenticate, get_next_url, is_safe_redirect,
-                               validate_auth_option)
+import tornado.auth
+
+from flower.views.auth import (OAuth2StateMixin, authenticate, get_next_url,
+                               is_safe_redirect, validate_auth_option)
 from tests.unit import AsyncHTTPTestCase
+
+
+class _StateHandler(OAuth2StateMixin):
+    def __init__(self, cookie=None, state_arg=None):
+        self._cookies = {'oauth_state': cookie.encode()} if cookie else {}
+        self._state_arg = state_arg
+
+    def set_secure_cookie(self, name, value):
+        self._cookies[name] = value.encode()
+
+    def get_secure_cookie(self, name):
+        return self._cookies.get(name)
+
+    def clear_cookie(self, name):
+        self._cookies.pop(name, None)
+
+    def get_argument(self, name, default=None):
+        return self._state_arg if self._state_arg is not None else default
 
 
 def _handler(next_value, url_prefix=''):
@@ -87,6 +107,24 @@ class AuthTests(AsyncHTTPTestCase):
         self.assertEqual('/flower', get_next_url(_handler(None, 'flower')))
         # a bare path is normalized under the prefix, matching prior behavior
         self.assertEqual('/workers', get_next_url(_handler('workers', 'flower')))
+
+    def test_oauth_state_roundtrip(self):
+        h = _StateHandler()
+        state = h.set_oauth_state()
+        self.assertEqual(state, h.get_secure_cookie('oauth_state').decode())
+
+    def test_verify_oauth_state_matches_and_clears(self):
+        h = _StateHandler(cookie='abc', state_arg='abc')
+        h.verify_oauth_state()
+        self.assertIsNone(h.get_secure_cookie('oauth_state'))
+
+    def test_verify_oauth_state_mismatch(self):
+        h = _StateHandler(cookie='abc', state_arg='xyz')
+        self.assertRaises(tornado.auth.AuthError, h.verify_oauth_state)
+
+    def test_verify_oauth_state_missing_cookie(self):
+        h = _StateHandler(cookie=None, state_arg='abc')
+        self.assertRaises(tornado.auth.AuthError, h.verify_oauth_state)
 
     def test_authenticate_wildcard_email(self):
         self.assertTrue(authenticate(".*@example.com", "one@example.com"))

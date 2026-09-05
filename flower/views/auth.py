@@ -54,12 +54,30 @@ def validate_auth_option(pattern):
     return True
 
 
-class GoogleAuth2LoginHandler(BaseHandler, tornado.auth.GoogleOAuth2Mixin):
+class OAuth2StateMixin:
+    "Mixin guarding the OAuth login flow against CSRF with a state cookie"
+
+    def set_oauth_state(self):
+        state = str(uuid.uuid4())
+        self.set_secure_cookie('oauth_state', state)
+        return state
+
+    def verify_oauth_state(self):
+        expected = (self.get_secure_cookie('oauth_state') or b'').decode()
+        if not expected or self.get_argument('state', None) != expected:
+            raise tornado.auth.AuthError(
+                'OAuth authenticator error: State tokens do not match')
+        self.clear_cookie('oauth_state')
+
+
+class GoogleAuth2LoginHandler(BaseHandler, OAuth2StateMixin,
+                              tornado.auth.GoogleOAuth2Mixin):
     _OAUTH_SETTINGS_KEY = 'oauth'
 
     async def get(self):
         redirect_uri = self.settings[self._OAUTH_SETTINGS_KEY]['redirect_uri']
         if self.get_argument('code', False):
+            self.verify_oauth_state()
             user = await self.get_authenticated_user(
                 redirect_uri=redirect_uri,
                 code=self.get_argument('code'),
@@ -71,7 +89,8 @@ class GoogleAuth2LoginHandler(BaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 client_id=self.settings[self._OAUTH_SETTINGS_KEY]['key'],
                 scope=['profile', 'email'],
                 response_type='code',
-                extra_params={'approval_prompt': ''}
+                extra_params={'approval_prompt': '',
+                              'state': self.set_oauth_state()}
             )
 
     async def _on_auth(self, user):
@@ -101,7 +120,7 @@ class LoginHandler(BaseHandler):
         return instantiate(options.auth_provider or NotFoundErrorHandler, *args, **kwargs)
 
 
-class GithubLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
+class GithubLoginHandler(BaseHandler, OAuth2StateMixin, tornado.auth.OAuth2Mixin):
 
     _OAUTH_DOMAIN = os.getenv(
         "FLOWER_GITHUB_OAUTH_DOMAIN", "github.com")
@@ -133,6 +152,7 @@ class GithubLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
     async def get(self):
         redirect_uri = self.settings[self._OAUTH_SETTINGS_KEY]['redirect_uri']
         if self.get_argument('code', False):
+            self.verify_oauth_state()
             user = await self.get_authenticated_user(
                 redirect_uri=redirect_uri,
                 code=self.get_argument('code'),
@@ -144,7 +164,8 @@ class GithubLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
                 client_id=self.settings[self._OAUTH_SETTINGS_KEY]['key'],
                 scope=['user:email'],
                 response_type='code',
-                extra_params={'approval_prompt': ''}
+                extra_params={'approval_prompt': '',
+                              'state': self.set_oauth_state()}
             )
 
     async def _on_auth(self, user):
@@ -180,7 +201,7 @@ class GithubLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
         self.redirect(get_next_url(self))
 
 
-class GitLabLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
+class GitLabLoginHandler(BaseHandler, OAuth2StateMixin, tornado.auth.OAuth2Mixin):
 
     _OAUTH_GITLAB_DOMAIN = os.getenv(
         "FLOWER_GITLAB_OAUTH_DOMAIN", "gitlab.com")
@@ -210,6 +231,7 @@ class GitLabLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
     async def get(self):
         redirect_uri = self.settings['oauth']['redirect_uri']
         if self.get_argument('code', False):
+            self.verify_oauth_state()
             user = await self.get_authenticated_user(
                 redirect_uri=redirect_uri,
                 code=self.get_argument('code'),
@@ -221,7 +243,8 @@ class GitLabLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
                 client_id=self.settings['oauth']['key'],
                 scope=['read_api'],
                 response_type='code',
-                extra_params={'approval_prompt': ''},
+                extra_params={'approval_prompt': '',
+                              'state': self.set_oauth_state()},
             )
 
     async def _on_auth(self, user):
@@ -269,7 +292,7 @@ class GitLabLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
         self.redirect(get_next_url(self))
 
 
-class OktaLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
+class OktaLoginHandler(BaseHandler, OAuth2StateMixin, tornado.auth.OAuth2Mixin):
     _OAUTH_NO_CALLBACKS = False
     _OAUTH_SETTINGS_KEY = 'oauth'
 
@@ -312,27 +335,19 @@ class OktaLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
     async def get(self):
         redirect_uri = self.settings[self._OAUTH_SETTINGS_KEY]['redirect_uri']
         if self.get_argument('code', False):
-            expected_state = (self.get_secure_cookie('oauth_state') or b'').decode('utf-8')
-            returned_state = self.get_argument('state')
-
-            if returned_state is None or returned_state != expected_state:
-                raise tornado.auth.AuthError(
-                    'OAuth authenticator error: State tokens do not match')
-
+            self.verify_oauth_state()
             access_token_response = await self.get_access_token(
                 redirect_uri=redirect_uri,
                 code=self.get_argument('code'),
             )
             await self._on_auth(access_token_response)
         else:
-            state = str(uuid.uuid4())
-            self.set_secure_cookie("oauth_state", state)
             self.authorize_redirect(
                 redirect_uri=redirect_uri,
                 client_id=self.settings[self._OAUTH_SETTINGS_KEY]['key'],
                 scope=['openid email'],
                 response_type='code',
-                extra_params={'state': state}
+                extra_params={'state': self.set_oauth_state()}
             )
 
     async def _on_auth(self, access_token_response):
@@ -360,6 +375,5 @@ class OktaLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
             raise tornado.web.HTTPError(403, message)
 
         self.set_secure_cookie("user", str(email))
-        self.clear_cookie('oauth_state')
 
         self.redirect(get_next_url(self))
