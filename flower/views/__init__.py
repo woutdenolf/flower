@@ -146,9 +146,11 @@ class BaseHandler(tornado.web.RequestHandler):
                 return user
         return None
 
-    # pylint: disable=dangerous-default-value
-    def get_argument(self, name, default=[], strip=True, type=None):
+    def get_argument(self, name, default=None, strip=True, type=None,
+                     required=False):
         arg = super().get_argument(name, default, strip)
+        if required and (arg is None or arg == ''):
+            raise tornado.web.HTTPError(400, f"Missing argument {name}")
         if arg and isinstance(arg, str):
             arg = tornado.escape.xhtml_escape(arg)
         if type is not None:

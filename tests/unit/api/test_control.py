@@ -196,6 +196,21 @@ class WorkerControlTests(BaseApiTestCase):
             self.assertEqual(403, r.code)
             celery.control.broadcast.assert_not_called()
 
+    def test_add_consumer_missing_queue(self):
+        celery = self._app.capp
+        celery.control.broadcast = MagicMock()
+        r = self.post('/api/worker/queue/add-consumer/test', body={})
+        self.assertEqual(400, r.code)
+        self.assertIn('Missing argument queue', r.body.decode('utf-8'))
+        celery.control.broadcast.assert_not_called()
+
+    def test_cancel_consumer_missing_queue(self):
+        celery = self._app.capp
+        celery.control.broadcast = MagicMock()
+        r = self.post('/api/worker/queue/cancel-consumer/test', body={})
+        self.assertEqual(400, r.code)
+        celery.control.broadcast.assert_not_called()
+
     def test_cancel_consumer(self):
         celery = self._app.capp
         celery.control.broadcast = MagicMock(
@@ -251,6 +266,23 @@ class WorkerControlTests(BaseApiTestCase):
         )
         self.assertEqual(403, r.code)
         self.assertEqual(b"Failed to set timeouts: 'time limits not supported'", r.body)
+
+    def test_task_timeout_missing_workername(self):
+        celery = self._app.capp
+        celery.control.time_limit = MagicMock()
+
+        r = self.post('/api/task/timeout/celery.map', body={'soft': 1.2})
+        self.assertEqual(400, r.code)
+        self.assertIn('Missing argument workername', r.body.decode('utf-8'))
+        celery.control.time_limit.assert_not_called()
+
+    def test_task_ratelimit_missing_workername(self):
+        celery = self._app.capp
+        celery.control.rate_limit = MagicMock()
+
+        r = self.post('/api/task/rate-limit/celery.map', body={'ratelimit': 20})
+        self.assertEqual(400, r.code)
+        celery.control.rate_limit.assert_not_called()
 
     def test_task_ratelimit(self):
         celery = self._app.capp
