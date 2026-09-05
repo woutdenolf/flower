@@ -58,6 +58,31 @@ class PrometheusMetrics:
             ['worker']
         )
 
+    def observe_task(self, worker, event, task):
+        event_type = event['type']
+        name = event.get('name') or task.name or ''
+        self.events.labels(worker, event_type, name).inc()
+        if event.get('runtime'):
+            self.runtime.labels(worker, name).observe(event['runtime'])
+
+        # Prefetch metrics only make sense for tasks without a scheduled time
+        if task.eta or not task.received:
+            return
+        if event_type == 'task-received':
+            self.number_of_prefetched_tasks.labels(worker, name).inc()
+        elif event_type == 'task-started' and task.started:
+            self.prefetch_time.labels(worker, name).set(task.started - task.received)
+            self.number_of_prefetched_tasks.labels(worker, name).dec()
+        elif event_type in ('task-succeeded', 'task-failed') and task.started:
+            self.prefetch_time.labels(worker, name).set(0)
+
+    def observe_worker(self, worker, event):
+        online = {'worker-online': 1, 'worker-heartbeat': 1, 'worker-offline': 0}
+        if event['type'] in online:
+            self.worker_online.labels(worker).set(online[event['type']])
+        if event['type'] == 'worker-heartbeat' and event.get('active') is not None:
+            self.worker_number_of_currently_executing_tasks.labels(worker).set(event['active'])
+
     def remove_workers(self, worker_names):
         metrics = (
             self.events,
@@ -87,75 +112,39 @@ class EventsState(State):
         self.counter = collections.defaultdict(Counter)
         self.metrics = get_prometheus_metrics()
         self.search_engine = TaskSearchEngine()
-        self._rebuild_search_index()
-
-    def _rebuild_search_index(self):
         self.search_engine.rebuild(self.tasks.items())
 
     def _clear_tasks(self, ready=True):
         super()._clear_tasks(ready)
-        self._rebuild_search_index()
+        self.search_engine.rebuild(self.tasks.items())
 
-    # pylint: disable=too-many-branches
+    def _eviction_candidate(self, task_id):
+        # Celery discards the least recently used task when a new one
+        # arrives at the limit, so remember which one may go
+        limit = self.tasks.limit
+        if not limit or task_id in self.tasks or len(self.tasks) < limit:
+            return None
+        return next(iter(self.tasks), None)
+
+    def _index_task(self, task, evicted):
+        if evicted is not None and evicted not in self.tasks:
+            self.search_engine.remove(evicted)
+        self.search_engine.upsert(task)
+
     def event(self, event):
-        event_type = event['type']
-        lru_task_id = None
-        if event_type.startswith('task-'):
-            task_id = event.get('uuid')
-            limit = getattr(self.tasks, 'limit', None)
-            # Celery may discard the least recently used task while applying
-            # this event. Remember its ID so its search entry can be removed
-            if task_id not in self.tasks and limit and len(self.tasks) >= limit:
-                lru_task_id = next(iter(self.tasks), None)
+        event_type, worker = event['type'], event['hostname']
+        is_task = event_type.startswith('task-')
+        evicted = self._eviction_candidate(event.get('uuid')) if is_task else None
 
-        # Save the event
         super().event(event)
+        self.counter[worker][event_type] += 1
 
-        worker_name = event['hostname']
-
-        self.counter[worker_name][event_type] += 1
-
-        if event_type.startswith('task-'):
-            task_id = event['uuid']
-            task = self.tasks.get(task_id)
-            if lru_task_id is not None and lru_task_id not in self.tasks:
-                self.search_engine.remove(lru_task_id)
-            if task is not None:
-                self.search_engine.upsert(task)
-            task_name = event.get('name', '')
-            if not task_name and task_id in self.tasks:
-                task_name = task.name or ''
-            self.metrics.events.labels(worker_name, event_type, task_name).inc()
-
-            runtime = event.get('runtime', 0)
-            if runtime:
-                self.metrics.runtime.labels(worker_name, task_name).observe(runtime)
-
-            task_started = task.started
-            task_received = task.received
-
-            if event_type == 'task-received' and not task.eta and task_received:
-                self.metrics.number_of_prefetched_tasks.labels(worker_name, task_name).inc()
-
-            if event_type == 'task-started' and not task.eta and task_started and task_received:
-                self.metrics.prefetch_time.labels(worker_name, task_name).set(task_started - task_received)
-                self.metrics.number_of_prefetched_tasks.labels(worker_name, task_name).dec()
-
-            if event_type in ['task-succeeded', 'task-failed'] and not task.eta and task_started and task_received:
-                self.metrics.prefetch_time.labels(worker_name, task_name).set(0)
-
-        if event_type == 'worker-online':
-            self.metrics.worker_online.labels(worker_name).set(1)
-
-        if event_type == 'worker-heartbeat':
-            self.metrics.worker_online.labels(worker_name).set(1)
-
-            num_executing_tasks = event.get('active')
-            if num_executing_tasks is not None:
-                self.metrics.worker_number_of_currently_executing_tasks.labels(worker_name).set(num_executing_tasks)
-
-        if event_type == 'worker-offline':
-            self.metrics.worker_online.labels(worker_name).set(0)
+        if is_task:
+            task = self.tasks[event['uuid']]
+            self._index_task(task, evicted)
+            self.metrics.observe_task(worker, event, task)
+        else:
+            self.metrics.observe_worker(worker, event)
 
 
 class Events(threading.Thread):
