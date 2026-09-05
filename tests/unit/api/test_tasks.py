@@ -38,6 +38,25 @@ class ApplyTests(BaseApiTestCase):
         self.assertEqual(result, json.loads(body)['result'])
         task.apply_async.assert_called_once_with(args=[], kwargs={})
 
+    def test_apply_unserializable_result_returns_repr(self):
+        result = object()
+        with patch('celery.result.AsyncResult.state', new_callable=PropertyMock) as mock_state:
+            with patch('celery.result.AsyncResult.result', new_callable=PropertyMock) as mock_result:
+                mock_state.return_value = states.SUCCESS
+                mock_result.return_value = result
+
+                ar = AsyncResult(123)
+                ar.get = Mock(return_value=result)
+
+                task = self._app.capp.tasks['foo'] = Mock()
+                task.apply_async = Mock(return_value=ar)
+
+                r = self.post('/api/task/apply/foo', body='')
+
+        self.assertEqual(200, r.code)
+        body = json.loads(r.body.decode('utf-8'))
+        self.assertEqual(repr(result), body['result'])
+
     def test_apply_timeout_expiry_returns_state(self):
         with patch('celery.result.AsyncResult.state', new_callable=PropertyMock) as mock_state:
             mock_state.return_value = states.PENDING
@@ -269,8 +288,6 @@ class TaskTests(BaseApiTestCase):
                                         id='789')
         events += task_succeeded_events(worker='worker1', name='task4',
                                         id='666')
-
-        # for i, e in enumerate(sorted(events, key=lambda event: event['uuid'])):
 
         for i, e in enumerate(events):
             e['clock'] = i
