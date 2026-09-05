@@ -27,8 +27,9 @@ class BaseApiHandler(BaseHandler):
 
     def write_error(self, status_code, **kwargs):
         exc_info = kwargs.get('exc_info')
-        log_message = getattr(exc_info[1], 'log_message', None) if exc_info else None
-        if log_message:
+        exc = exc_info[1] if exc_info else None
+        message = exc.get_message() if isinstance(exc, tornado.web.HTTPError) else None
+        if message:
             self.set_header('Content-Type', 'text/plain; charset=UTF-8')
-            self.write(log_message)
+            self.write(message)
         self.finish()

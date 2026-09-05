@@ -205,6 +205,12 @@ class TaskTests(BaseApiTestCase):
     def test_task_info(self):
         self.get('/api/task/info/123')
 
+    def test_unknown_task_error_preserves_percent(self):
+        r = self.get('/api/task/info/foo%25bar')
+
+        self.assertEqual(404, r.code)
+        self.assertIn("Unknown task 'foo%bar'", r.body.decode('utf-8'))
+
     def test_tasks_pagination(self):
         state = EventsState()
         state.get_or_create_worker('worker1')
