@@ -1,10 +1,8 @@
-import asyncio
 import json
 import logging
 import numbers
 import socket
 import ssl
-import sys
 from urllib.parse import quote, unquote, urljoin, urlparse
 
 from tornado import httpclient, ioloop
@@ -304,21 +302,3 @@ class Broker:
 
     async def queues(self, names):
         raise NotImplementedError
-
-
-async def main():
-    broker_url = sys.argv[1] if len(sys.argv) > 1 else 'amqp://'
-    queue_name = sys.argv[2] if len(sys.argv) > 2 else 'celery'
-    if len(sys.argv) > 3:
-        http_api = sys.argv[3]
-    else:
-        http_api = 'http://guest:guest@localhost:15672/api/'
-
-    broker = Broker(broker_url, http_api=http_api)
-    queues = await broker.queues([queue_name])
-    if queues:
-        print(queues)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
