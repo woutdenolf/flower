@@ -1,16 +1,31 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import tornado.auth
 
 from flower.utils.authentication import authenticate, validate_auth_option
 from flower.views import BaseHandler
-from flower.views.auth import OAuth2StateMixin, get_next_url, is_safe_redirect
+from flower.views.auth import (GithubLoginHandler, OAuth2StateMixin,
+                               get_next_url, is_safe_redirect)
 from tests.unit import AsyncHTTPTestCase
 
 
 class DummyLoginHandler(BaseHandler):
     def get(self):
         self.write('login page')
+
+
+class GithubEmailApiUrlTests(AsyncHTTPTestCase):
+    def test_github_com_uses_api_subdomain(self):
+        with patch.object(GithubLoginHandler, '_OAUTH_DOMAIN', 'github.com'):
+            self.assertEqual('https://api.github.com/user/emails',
+                             GithubLoginHandler._email_api_url())
+
+    def test_enterprise_server_uses_api_v3_path(self):
+        with patch.object(GithubLoginHandler, '_OAUTH_DOMAIN',
+                          'ghe.example.com'):
+            self.assertEqual('https://ghe.example.com/api/v3/user/emails',
+                             GithubLoginHandler._email_api_url())
 
 
 class LoginRouteTests(AsyncHTTPTestCase):

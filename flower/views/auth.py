@@ -149,6 +149,13 @@ class GithubLoginHandler(BaseHandler, OAuth2StateMixin, tornado.auth.OAuth2Mixin
                               'state': self.set_oauth_state()}
             )
 
+    @classmethod
+    def _email_api_url(cls):
+        if cls._OAUTH_DOMAIN == 'github.com':
+            return 'https://api.github.com/user/emails'
+        # GitHub Enterprise Server serves the API under /api/v3
+        return f'https://{cls._OAUTH_DOMAIN}/api/v3/user/emails'
+
     async def _on_auth(self, user):
         if not user:
             raise tornado.web.HTTPError(500, 'OAuth authentication failed')
@@ -156,7 +163,7 @@ class GithubLoginHandler(BaseHandler, OAuth2StateMixin, tornado.auth.OAuth2Mixin
 
         try:
             response = await self.get_auth_http_client().fetch(
-                f'https://api.{self._OAUTH_DOMAIN}/user/emails',
+                self._email_api_url(),
                 headers={'Authorization': 'token ' + access_token,
                          'User-agent': 'Tornado auth'})
         except Exception as e:
