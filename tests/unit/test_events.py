@@ -43,6 +43,32 @@ class PersistenceTests(AsyncTestCase):
             self.assertEqual(
                 1, restored_again.state.counter['worker3']['task-received'])
 
+    def test_failed_save_preserves_previous_db(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db)
+            events.state.counter['worker1']['task-received'] = 2
+            events.save_state()
+
+            events.state.counter['worker1']['task-received'] = 5
+            events.state.counter['worker1']['unpicklable'] = lambda: None
+            with self.assertRaises(Exception):
+                events.save_state()
+
+            restored = self.events(db)
+            self.assertEqual(
+                2, restored.state.counter['worker1']['task-received'])
+
+    def test_save_leaves_no_temporary_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db)
+            events.state.counter['worker1']['task-received'] = 1
+            events.save_state()
+
+            leftovers = [f for f in os.listdir(tmpdir) if '.tmp' in f]
+            self.assertEqual([], leftovers)
+
     def test_loads_database_without_persisted_counters(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db = os.path.join(tmpdir, 'flower')

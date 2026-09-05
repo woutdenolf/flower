@@ -1,5 +1,7 @@
 import collections
+import glob
 import logging
+import os
 import shelve
 import threading
 import time
@@ -243,10 +245,16 @@ class Events(threading.Thread):
 
     def save_state(self):
         logger.debug("Saving state to '%s'...", self.db)
-        state = shelve.open(self.db, flag='n')
-        state['events'] = self.state
-        state['counter'] = dict(self.state.counter)
-        state.close()
+        tmp = f'{self.db}.tmp'
+        state = shelve.open(tmp, flag='n')
+        try:
+            state['events'] = self.state
+            state['counter'] = dict(self.state.counter)
+        finally:
+            state.close()
+        # dbm backends may add suffixes like .db or .dat to the actual files
+        for name in glob.glob(glob.escape(tmp) + '*'):
+            os.replace(name, self.db + name[len(tmp):])
 
     async def on_enable_events(self):
         # Periodically enable events for workers
