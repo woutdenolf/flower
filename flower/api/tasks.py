@@ -6,6 +6,7 @@ from datetime import datetime
 from celery import states
 from celery.backends.base import DisabledBackend
 from celery.contrib.abortable import AbortableAsyncResult
+from celery.exceptions import TimeoutError as CeleryTimeoutError
 from celery.result import AsyncResult
 from tornado import web
 from tornado.escape import json_decode
@@ -121,8 +122,10 @@ All other top-level request body properties are passed to ``Task.apply_async``.
 
 :query args: a list of arguments
 :query kwargs: a dictionary of arguments
+:query timeout: timeout in seconds
 :reqheader Authorization: optional OAuth token to authenticate
 :statuscode 200: no error
+:statuscode 400: invalid options
 :statuscode 401: unauthorized request
 :statuscode 403: read only mode is enabled
 :statuscode 404: unknown task
@@ -139,6 +142,12 @@ All other top-level request body properties are passed to ``Task.apply_async``.
         except KeyError as exc:
             raise HTTPError(404, f"Unknown task '{taskname}'") from exc
 
+        timeout = options.pop('timeout', None)
+        try:
+            timeout = float(timeout) if timeout is not None else None
+        except (TypeError, ValueError) as exc:
+            raise HTTPError(400, 'Invalid timeout') from exc
+
         try:
             self.normalize_options(options)
         except ValueError as exc:
@@ -151,13 +160,17 @@ All other top-level request body properties are passed to ``Task.apply_async``.
 
         response = await self.run_blocking(
             'task.result_wait', result.task_id, self.wait_results,
-            result, response,
+            result, response, timeout,
             connection_errors=self.backend_connection_errors(result))
         self.write(response)
 
-    def wait_results(self, result, response):
+    def wait_results(self, result, response, timeout=None):
         # Wait until task finished and do not raise anything
-        result.get(propagate=False)
+        try:
+            result.get(propagate=False, timeout=timeout)
+        except CeleryTimeoutError:
+            response.update(state=result.state)
+            return response
         # Write results and finish async function
         self.update_response_result(response, result)
         if self.backend_configured(result):
@@ -351,7 +364,10 @@ Get a task result
     def read_result(self, result, timeout):
         response = {'task-id': result.id, 'state': result.state}
         if timeout:
-            result.get(timeout=timeout, propagate=False)
+            try:
+                result.get(timeout=timeout, propagate=False)
+            except CeleryTimeoutError:
+                return response
             self.update_response_result(response, result)
         elif result.ready():
             self.update_response_result(response, result)

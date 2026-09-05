@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import celery.states as states
 from celery.events import Event
+from celery.exceptions import TimeoutError as CeleryTimeoutError
 from celery.result import AsyncResult
 from kombu.exceptions import OperationalError
 from tornado.options import options
@@ -36,6 +37,33 @@ class ApplyTests(BaseApiTestCase):
         body = bytes.decode(r.body)
         self.assertEqual(result, json.loads(body)['result'])
         task.apply_async.assert_called_once_with(args=[], kwargs={})
+
+    def test_apply_timeout_expiry_returns_state(self):
+        with patch('celery.result.AsyncResult.state', new_callable=PropertyMock) as mock_state:
+            mock_state.return_value = states.PENDING
+
+            ar = AsyncResult(123)
+            ar.get = Mock(side_effect=CeleryTimeoutError())
+
+            task = self._app.capp.tasks['foo'] = Mock()
+            task.apply_async = Mock(return_value=ar)
+
+            r = self.post('/api/task/apply/foo', body='{"timeout": 0.1}')
+
+        self.assertEqual(200, r.code)
+        body = json.loads(r.body.decode('utf-8'))
+        self.assertEqual(states.PENDING, body['state'])
+        self.assertNotIn('result', body)
+        ar.get.assert_called_once_with(propagate=False, timeout=0.1)
+        task.apply_async.assert_called_once_with(args=[], kwargs={})
+
+    def test_apply_invalid_timeout(self):
+        task = self._app.capp.tasks['foo'] = Mock()
+
+        r = self.post('/api/task/apply/foo', body='{"timeout": "abc"}')
+
+        self.assertEqual(400, r.code)
+        task.apply_async.assert_not_called()
 
     def test_apply_read_only(self):
         with patch.object(options.mockable(), 'read_only', True):
@@ -152,6 +180,24 @@ class TaskResultTests(BaseApiTestCase):
         r = self.get('/api/task/result/123')
 
         self.assertEqual(503, r.code)
+
+
+class TaskResultTimeoutExpiryTests(BaseApiTestCase):
+    @patch('flower.api.tasks.AsyncResult')
+    def test_timeout_expiry_returns_state(self, async_result):
+        result = Mock()
+        result.id = '123'
+        result.state = states.STARTED
+        result.backend.connection_errors = ()
+        result.get.side_effect = CeleryTimeoutError()
+        async_result.return_value = result
+
+        r = self.get('/api/task/result/123?timeout=1')
+
+        self.assertEqual(200, r.code)
+        body = json.loads(r.body.decode('utf-8'))
+        self.assertEqual(states.STARTED, body['state'])
+        self.assertNotIn('result', body)
 
 
 class TaskResultInvalidTimeoutTests(BaseApiTestCase):
