@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class BaseHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
+        self.set_header('X-Content-Type-Options', 'nosniff')
         if not (self.application.options.basic_auth or self.application.options.auth):
             self.set_header("Access-Control-Allow-Origin", "*")
             self.set_header("Access-Control-Allow-Headers",
