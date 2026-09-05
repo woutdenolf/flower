@@ -756,7 +756,7 @@ var flower = (function () {
                             }).join(', ') + '">' +
                             values.join('') + '</span>';
                     }
-                    return data || 'N/A';
+                    return data ? htmlEscapeEntities(String(data)) : 'N/A';
                 }
             }, ]),
         });
