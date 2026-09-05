@@ -1,3 +1,4 @@
+import ssl
 import unittest
 from unittest.mock import MagicMock
 
@@ -54,6 +55,22 @@ class TestRabbitMQ(unittest.TestCase):
         with self.assertLogs('', level='ERROR') as cm:
             RabbitMQ('amqp://user:pass@host:10000/vhost', http_api='ftp://')
             self.assertEqual(['ERROR:flower.utils.broker:Invalid broker api url: ftp://'], cm.output)
+
+    def test_verifies_cert_by_default(self):
+        b = RabbitMQ('amqps://user:pass@host:15672/vhost', '')
+        self.assertEqual({'validate_cert': True}, b._tls_kwargs())
+
+    def test_honors_broker_use_ssl_ca_certs(self):
+        b = RabbitMQ('amqps://user:pass@host:15672/vhost', '',
+                     broker_use_ssl={'ssl_ca_certs': '/etc/ca.pem'})
+        self.assertEqual(
+            {'validate_cert': True, 'ca_certs': '/etc/ca.pem'}, b._tls_kwargs())
+
+    def test_broker_use_ssl_cert_none_disables_verification(self):
+        b = RabbitMQ('amqps://user:pass@host:15672/vhost', '',
+                     broker_use_ssl={'ssl_cert_reqs': ssl.CERT_NONE,
+                                     'ssl_ca_certs': '/etc/ca.pem'})
+        self.assertEqual({'validate_cert': False}, b._tls_kwargs())
 
 
 class TestRedis(unittest.TestCase):

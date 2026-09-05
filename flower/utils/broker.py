@@ -3,6 +3,7 @@ import json
 import logging
 import numbers
 import socket
+import ssl
 import sys
 from urllib.parse import quote, unquote, urljoin, urlparse
 
@@ -37,9 +38,10 @@ class BrokerBase:
 
 
 class RabbitMQ(BrokerBase):
-    def __init__(self, broker_url, http_api, io_loop=None, **__):
+    def __init__(self, broker_url, http_api, io_loop=None, **kwargs):
         super().__init__(broker_url)
         self.io_loop = io_loop or ioloop.IOLoop.instance()
+        self.kwargs = kwargs
 
         self.host = self.host or 'localhost'
         self.port = self.port or 15672
@@ -68,7 +70,7 @@ class RabbitMQ(BrokerBase):
             response = await http_client.fetch(
                 url, auth_username=username, auth_password=password,
                 connect_timeout=1.0, request_timeout=2.0,
-                validate_cert=False)
+                **self._tls_kwargs())
         except (socket.error, httpclient.HTTPError) as e:
             logger.error("RabbitMQ management API call failed: %s", e)
             return []
@@ -79,6 +81,17 @@ class RabbitMQ(BrokerBase):
             info = json.loads(response.body.decode())
             return [x for x in info if x['name'] in names]
         response.rethrow()
+
+    def _tls_kwargs(self):
+        "derive TLS kwargs from Celery's broker_use_ssl config"
+        broker_use_ssl = self.kwargs.get('broker_use_ssl')
+        if isinstance(broker_use_ssl, dict):
+            if broker_use_ssl.get('ssl_cert_reqs') == ssl.CERT_NONE:
+                return {'validate_cert': False}
+            ca_certs = broker_use_ssl.get('ssl_ca_certs')
+            if ca_certs:
+                return {'validate_cert': True, 'ca_certs': ca_certs}
+        return {'validate_cert': True}
 
     @classmethod
     def validate_http_api(cls, http_api):
