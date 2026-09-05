@@ -5,6 +5,7 @@ import logging
 import hmac
 
 from base64 import b64decode
+from urllib.parse import urlparse
 
 import tornado
 import tornado.auth
@@ -40,11 +41,30 @@ class BaseHandler(tornado.web.RequestHandler):
         super().render(*args, **kwargs)
 
     def check_xsrf_cookie(self):
-        # Only OAuth cookie sessions are forgeable
-        if not self.application.options.auth:
+        options = self.application.options
+        site = self.request.headers.get('Sec-Fetch-Site')
+        origin = self.request.headers.get('Origin')
+
+        # No authentication configured
+        if not (options.basic_auth or options.auth):
             return
+
+        # Cross-site request
+        if site and site != 'same-origin':
+            raise tornado.web.HTTPError(403, 'Cross-site request forbidden')
+
+        # Mismatched origin, no fetch metadata
+        if not site and origin and urlparse(origin).netloc != self.request.host:
+            raise tornado.web.HTTPError(403, 'Cross-origin request forbidden')
+
+        # Basic auth, no cookie session
+        if not options.auth:
+            return
+
+        # Token client, no cookie session
         if self.request.headers.get('Authorization'):
             return
+
         super().check_xsrf_cookie()
 
     def set_secure_cookie(self, name, value, expires_days=30, version=None, **kwargs):
