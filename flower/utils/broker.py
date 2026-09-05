@@ -120,6 +120,18 @@ class RedisBase(BrokerBase):
         self.socket_timeout = broker_options.get(
             'socket_timeout', self.DEFAULT_SOCKET_TIMEOUT)
 
+    def _prepare_virtual_host(self, vhost):
+        if not isinstance(vhost, numbers.Integral):
+            if not vhost or vhost == '/':
+                vhost = 0
+            elif vhost.startswith('/'):
+                vhost = vhost[1:]
+            try:
+                vhost = int(vhost)
+            except ValueError as exc:
+                raise ValueError(f'Database is int between 0 and limit - 1, not {vhost}') from exc
+        return vhost
+
     def _q_for_pri(self, queue, pri):
         if pri not in self.priority_steps:
             raise ValueError('Priority not in priority steps')
@@ -158,18 +170,6 @@ class Redis(RedisBase):
         self.vhost = self._prepare_virtual_host(self.vhost)
         self.redis = self._get_redis_client()
 
-    def _prepare_virtual_host(self, vhost):
-        if not isinstance(vhost, numbers.Integral):
-            if not vhost or vhost == '/':
-                vhost = 0
-            elif vhost.startswith('/'):
-                vhost = vhost[1:]
-            try:
-                vhost = int(vhost)
-            except ValueError as exc:
-                raise ValueError(f'Database is int between 0 and limit - 1, not {vhost}') from exc
-        return vhost
-
     def _get_redis_client_args(self):
         return {
             'host': self.host,
@@ -197,18 +197,6 @@ class RedisSentinel(RedisBase):
         self.vhost = self._prepare_virtual_host(self.vhost)
         self.master_name = self._prepare_master_name(broker_options)
         self.redis = self._get_redis_client(broker_options, broker_use_ssl)
-
-    def _prepare_virtual_host(self, vhost):
-        if not isinstance(vhost, numbers.Integral):
-            if not vhost or vhost == '/':
-                vhost = 0
-            elif vhost.startswith('/'):
-                vhost = vhost[1:]
-            try:
-                vhost = int(vhost)
-            except ValueError as exc:
-                raise ValueError('Database is int between 0 and limit - 1, not {vhost}') from exc
-        return vhost
 
     def _prepare_master_name(self, broker_options):
         try:

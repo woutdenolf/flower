@@ -89,6 +89,11 @@ class TestRabbitMQ(unittest.TestCase):
 
 
 class TestRedis(unittest.TestCase):
+    def test_invalid_database_error_message(self):
+        with self.assertRaises(ValueError) as cm:
+            Broker('redis://localhost:6379/notanint')
+        self.assertIn('notanint', str(cm.exception))
+
     def test_init(self):
         b = Broker('redis://localhost:6379/0')
         self.assertFalse(isinstance(b, RabbitMQ))
@@ -224,6 +229,12 @@ class TestRedisQueues(unittest.IsolatedAsyncioTestCase):
 
 
 class TestRedisSentinel(unittest.TestCase):
+    def test_invalid_database_error_message(self):
+        options = {'master_name': 'my_redis_master'}
+        with self.assertRaises(ValueError) as cm:
+            Broker('sentinel://localhost:26379/notanint', broker_options=options)
+        self.assertIn('notanint', str(cm.exception))
+
     def test_init(self):
         options = {'master_name': 'my_redis_master'}
         b = Broker('sentinel://localhost:26379/', broker_options=options)
