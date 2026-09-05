@@ -1,3 +1,5 @@
+:orphan:
+
 ========
  flower
 ========
@@ -98,10 +100,10 @@ TORNADO OPTIONS
                                    possible). By default use stderr if
                                    ``--log_file_prefix`` is not set and no other
                                    logging is configured.
-  --logging=debug|info|warning|error|none
-                                   Set the Python log level. If *none*, tornado
-                                   won't touch the logging configuration.
-                                   (default *info*)
+  --logging=LEVEL                  Set the Python log level to *debug*, *info*,
+                                   *warning*, *error* or *none*. If *none*,
+                                   tornado won't touch the logging
+                                   configuration. (default *info*)
 
 USAGE
 =====
