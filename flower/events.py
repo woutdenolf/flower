@@ -176,6 +176,7 @@ class Events(threading.Thread):
         self.enable_events = enable_events
         self.state = None
         self.state_save_timer = None
+        self.state_save_interval = state_save_interval
 
         if self.persistent:
             self.state = self.load_state()
@@ -262,6 +263,7 @@ class Events(threading.Thread):
 
     def save_state(self):
         logger.debug("Saving state to '%s'...", self.db)
+        started = time.time()
         tmp = f'{self.db}.tmp'
         state = shelve.open(tmp, flag='n')
         try:
@@ -272,6 +274,13 @@ class Events(threading.Thread):
         # dbm backends may add suffixes like .db or .dat to the actual files
         for name in glob.glob(glob.escape(tmp) + '*'):
             os.replace(name, self.db + name[len(tmp):])
+
+        elapsed = time.time() - started
+        interval_seconds = self.state_save_interval / 1000
+        if self.state_save_timer and elapsed > interval_seconds / 10:
+            logger.warning(
+                "Saving state took %.1fs, consider increasing "
+                "--state_save_interval or decreasing --max_tasks", elapsed)
 
     async def on_enable_events(self):
         # Periodically enable events for workers

@@ -13,9 +13,9 @@ from flower.events import Events
 
 
 class PersistenceTests(AsyncTestCase):
-    def events(self, db):
+    def events(self, db, **kwargs):
         return Events(Mock(), self.io_loop, db=db, persistent=True,
-                      enable_events=False)
+                      enable_events=False, **kwargs)
 
     def test_recovers_counters_and_continues_counting(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -120,6 +120,37 @@ class PersistenceTests(AsyncTestCase):
                 self.assertEqual({}, dict(events.state.counter))
                 self.assertTrue(os.path.exists(db + '.dat.corrupt'))
                 self.assertTrue(os.path.exists(db + '.dir.corrupt'))
+
+    def test_warns_when_save_dominates_interval(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db, state_save_interval=1000)
+
+            with self.assertLogs('flower.events', level='WARNING') as logs:
+                for _ in range(3):
+                    with patch('flower.events.time.time', side_effect=[0, 60]):
+                        events.save_state()
+
+            self.assertEqual(3, len(logs.output))
+            self.assertIn('state_save_interval', logs.output[0])
+
+    def test_no_warning_for_fast_saves(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db, state_save_interval=1000)
+
+            with patch('flower.events.time.time', side_effect=[0, 0.01]):
+                with self.assertNoLogs('flower.events', level='WARNING'):
+                    events.save_state()
+
+    def test_no_warning_without_save_timer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db)
+
+            with patch('flower.events.time.time', side_effect=[0, 60]):
+                with self.assertNoLogs('flower.events', level='WARNING'):
+                    events.save_state()
 
     def test_loads_database_without_persisted_counters(self):
         with tempfile.TemporaryDirectory() as tmpdir:
