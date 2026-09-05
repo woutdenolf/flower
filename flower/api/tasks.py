@@ -296,7 +296,6 @@ All other top-level request body properties are passed to ``Celery.send_task``.
 :statuscode 200: no error
 :statuscode 401: unauthorized request
 :statuscode 403: read only mode is enabled
-:statuscode 404: unknown task
         """
         if self.application.options.read_only:
             raise web.HTTPError(403, "Read only mode is enabled")
@@ -431,7 +430,7 @@ Return length of all active queues
 
 .. sourcecode:: http
 
-  GET /api/queues/length
+  GET /api/queues/length HTTP/1.1
   Host: localhost:5555
 
 **Example response**:

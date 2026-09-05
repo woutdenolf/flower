@@ -300,7 +300,7 @@ Start consuming from a queue
 
 .. sourcecode:: http
 
-  POST /api/worker/queue/add-consumer/celery@worker2?queue=sample-queue
+  POST /api/worker/queue/add-consumer/celery@worker2?queue=sample-queue HTTP/1.1
   Content-Length: 0
   Content-Type: application/x-www-form-urlencoded; charset=utf-8
   Host: localhost:5555
@@ -358,7 +358,7 @@ Stop consuming from a queue
 
 .. sourcecode:: http
 
-  POST /api/worker/queue/cancel-consumer/celery@worker2?queue=sample-queue
+  POST /api/worker/queue/cancel-consumer/celery@worker2?queue=sample-queue HTTP/1.1
   Content-Length: 0
   Content-Type: application/x-www-form-urlencoded; charset=utf-8
   Host: localhost:5555
@@ -416,7 +416,7 @@ Revoke a task
 
 .. sourcecode:: http
 
-  POST /api/task/revoke/1480b55c-b8b2-462c-985e-24af3e9158f9?terminate=true
+  POST /api/task/revoke/1480b55c-b8b2-462c-985e-24af3e9158f9?terminate=true HTTP/1.1
   Content-Length: 0
   Content-Type: application/x-www-form-urlencoded; charset=utf-8
   Host: localhost:5555
