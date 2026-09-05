@@ -46,6 +46,11 @@ class BaseHandler(tornado.web.RequestHandler):
             return
         super().check_xsrf_cookie()
 
+    def set_secure_cookie(self, name, value, expires_days=30, version=None, **kwargs):
+        kwargs.setdefault('httponly', True)
+        kwargs.setdefault('samesite', 'Lax')
+        super().set_secure_cookie(name, value, expires_days, version, **kwargs)
+
     def log_exception(self, typ, value, tb):
         # OAuth failures are user errors, not server faults
         if isinstance(value, tornado.auth.AuthError):
