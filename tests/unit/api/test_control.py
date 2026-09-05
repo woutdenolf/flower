@@ -384,7 +384,7 @@ class TaskControlTests(BaseApiTestCase):
                                                       signal='SIGUSR1')
 
 
-class ControlAuthTests(WorkerControlTests):
+class ControlAuthTests(BaseApiTestCase):
     def test_auth(self):
         with patch.object(options.mockable(), 'basic_auth', ['user1:password1']):
             app = self._app.capp
