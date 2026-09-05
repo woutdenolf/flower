@@ -66,6 +66,20 @@ var flower = (function () {
         return '';
     }
 
+    function getCookie(name) {
+        var match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return match ? decodeURIComponent(match.pop()) : '';
+    }
+
+    // Send the XSRF token on state-changing requests for the server's CSRF check
+    $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS)$/i.test(settings.type)) {
+                xhr.setRequestHeader('X-XSRFToken', getCookie('_xsrf'));
+            }
+        }
+    });
+
     //https://github.com/DataTables/DataTables/blob/1.10.11/media/js/jquery.dataTables.js#L14882
     function htmlEscapeEntities(d) {
         return typeof d === 'string' ?

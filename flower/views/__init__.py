@@ -29,11 +29,21 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def render(self, *args, **kwargs):
         app_options = self.application.options
+        # Set the _xsrf cookie so the UI's AJAX calls can echo the token back
+        _ = self.xsrf_token
         functions = inspect.getmembers(template, inspect.isfunction)
         assert not set(map(lambda x: x[0], functions)) & set(kwargs.keys())
         kwargs.update(functions)
         kwargs.update(url_prefix=app_options.url_prefix)
         super().render(*args, **kwargs)
+
+    def check_xsrf_cookie(self):
+        # Only OAuth cookie sessions are forgeable
+        if not self.application.options.auth:
+            return
+        if self.request.headers.get('Authorization'):
+            return
+        super().check_xsrf_cookie()
 
     def write_error(self, status_code, **kwargs):
         # Avoid re-running authentication while rendering an error response
