@@ -50,6 +50,18 @@ class TestFlowerCommand(AsyncHTTPTestCase):
                     extract_settings()
                 self.assertEqual(1, cm.exception.code)
 
+    def test_certfile_without_keyfile_exits(self):
+        with self.mock_option('certfile', 'cert.pem'):
+            with self.assertRaises(SystemExit) as cm:
+                extract_settings()
+            self.assertEqual(1, cm.exception.code)
+
+    def test_keyfile_without_certfile_exits(self):
+        with self.mock_option('keyfile', 'key.pem'):
+            with self.assertRaises(SystemExit) as cm:
+                extract_settings()
+            self.assertEqual(1, cm.exception.code)
+
     def test_valid_broker_api_accepted(self):
         for broker_api in ['http://guest:guest@localhost:15672/api/',
                            'https://rabbit.internal:15671/api/']:

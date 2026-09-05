@@ -143,6 +143,9 @@ def extract_settings():
                                        keyfile=abs_path(options.keyfile))
         if options.ca_certs:
             settings['ssl_options']['ca_certs'] = abs_path(options.ca_certs)
+    elif options.certfile or options.keyfile:
+        logger.error("Both 'certfile' and 'keyfile' are required to enable SSL")
+        sys.exit(1)
 
     if options.auth and not validate_auth_option(options.auth):
         logger.error("Invalid '--auth' option: %s", options.auth)
