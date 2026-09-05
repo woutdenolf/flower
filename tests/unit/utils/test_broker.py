@@ -21,7 +21,7 @@ class TestRabbitMQ(unittest.TestCase):
     def test_url(self):
         b = RabbitMQ('amqp://user:pass@host:10000/vhost', '')
         self.assertEqual('host', b.host)
-        self.assertEqual(10000, b.port)
+        self.assertEqual(15672, b.port)
         self.assertEqual('vhost', b.vhost)
         self.assertEqual('user', b.username)
         self.assertEqual('pass', b.password)
@@ -29,7 +29,7 @@ class TestRabbitMQ(unittest.TestCase):
     def test_url_vhost_slash(self):
         b = RabbitMQ('amqp://user:pass@host:10000//', '')
         self.assertEqual('host', b.host)
-        self.assertEqual(10000, b.port)
+        self.assertEqual(15672, b.port)
         self.assertEqual('/', b.vhost)
         self.assertEqual('user', b.username)
         self.assertEqual('pass', b.password)
@@ -51,6 +51,10 @@ class TestRabbitMQ(unittest.TestCase):
             self.assertEqual(0, b.vhost)
             self.assertEqual(None, b.username)
             self.assertEqual(None, b.password)
+
+    def test_http_api_ignores_amqp_port(self):
+        b = RabbitMQ('amqp://user:pass@host:5672/vhost', None)
+        self.assertEqual('http://user:pass@host:15672/api/vhost', b.http_api)
 
     def test_invalid_http_api(self):
         for http_api in ['ftp://guest:guest@host:15672/api/', 'http://']:
