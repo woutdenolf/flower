@@ -87,6 +87,17 @@ var flower = (function () {
             d;
     }
 
+    // DataTables writes cell values straight to innerHTML, so a column that
+    // does not build its own markup must be escaped
+    function withDefaultRenderer(columnDefs) {
+        columnDefs.forEach(function (def) {
+            if (!def.render) {
+                def.render = htmlEscapeEntities;
+            }
+        });
+        return columnDefs;
+    }
+
     function workerNameLink(workerName) {
         var name = String(workerName),
             escapedName = htmlEscapeEntities(name),
@@ -672,7 +683,7 @@ var flower = (function () {
                     $(api.column(column).footer()).html(footer);
                 }
             },
-            columnDefs: [{
+            columnDefs: withDefaultRenderer([{
                 targets: 0,
                 data: 'hostname',
                 type: 'natural',
@@ -741,13 +752,13 @@ var flower = (function () {
                             });
                         return '<span class="load-average" title="System load averages over 1, 5, and 15 minutes"' +
                             ' aria-label="System load averages: ' + periods.map(function (period, index) {
-                                return period + ' ' + data[index];
+                                return period + ' ' + htmlEscapeEntities(String(data[index]));
                             }).join(', ') + '">' +
                             values.join('') + '</span>';
                     }
                     return data || 'N/A';
                 }
-            }, ],
+            }, ]),
         });
 
         setWorkerColumnVisibility(workersTable, mobileWorkers.matches);
@@ -820,7 +831,7 @@ var flower = (function () {
             oSearch: {
                 "sSearch": initialState ? 'state:' + initialState : ''
             },
-            columnDefs: [{
+            columnDefs: withDefaultRenderer([{
                 targets: 0,
                 data: 'name',
                 visible: isColumnVisible('name'),
@@ -848,18 +859,26 @@ var flower = (function () {
                 visible: isColumnVisible('state'),
                 className: "text-center",
                 render: function (data, type, full, meta) {
+                    var badge;
                     switch (data) {
                     case 'SUCCESS':
-                        return '<span class="badge text-bg-success">' + data + '</span>';
+                        badge = 'text-bg-success';
+                        break;
                     case 'FAILURE':
-                        return '<span class="badge text-bg-danger">' + data + '</span>';
+                        badge = 'text-bg-danger';
+                        break;
                     case 'STARTED':
-                        return '<span class="badge task-state-started">' + data + '</span>';
+                        badge = 'task-state-started';
+                        break;
                     case 'RETRY':
-                        return '<span class="badge text-bg-warning">' + data + '</span>';
+                        badge = 'text-bg-warning';
+                        break;
                     default:
-                        return '<span class="badge text-bg-secondary">' + data + '</span>';
+                        badge = 'text-bg-secondary';
                     }
+                    // celery reports unknown task-* events as custom states
+                    return '<span class="badge ' + badge + '">' +
+                        htmlEscapeEntities(data) + '</span>';
                 }
             }, {
                 targets: 3,
@@ -965,7 +984,7 @@ var flower = (function () {
                 targets: 16,
                 data: 'eta',
                 visible: isColumnVisible('eta')
-            }, ],
+            }, ]),
         });
 
         setTaskColumnVisibility(tasksTable, mobileTasks.matches);
