@@ -14,8 +14,8 @@ from kombu.exceptions import OperationalError
 from prometheus_client import Counter as PrometheusCounter
 from prometheus_client import Gauge, Histogram
 from tornado.ioloop import PeriodicCallback
-from tornado.options import options
 
+from .options import options
 from .utils.search import TaskSearchEngine
 
 logger = logging.getLogger(__name__)
