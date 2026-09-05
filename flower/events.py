@@ -178,12 +178,7 @@ class Events(threading.Thread):
         self.state_save_timer = None
 
         if self.persistent:
-            logger.debug("Loading state from '%s'...", self.db)
-            state = shelve.open(self.db)
-            if state:
-                self.state = state['events']
-                self.state.counter.update(state.get('counter', {}))
-            state.close()
+            self.state = self.load_state()
 
             if state_save_interval:
                 self.state_save_timer = PeriodicCallback(self.save_state,
@@ -242,6 +237,28 @@ class Events(threading.Thread):
                              e, try_interval)
                 logger.debug(e, exc_info=True)
                 time.sleep(try_interval)
+
+    def load_state(self):
+        logger.debug("Loading state from '%s'...", self.db)
+        try:
+            state = shelve.open(self.db)
+            try:
+                if not state:
+                    return None
+                events = state['events']
+                events.counter.update(state.get('counter', {}))
+                return events
+            finally:
+                state.close()
+        except Exception as e:
+            logger.error("Failed to load state from '%s', moving it aside "
+                         "and starting fresh: %s", self.db, e)
+            # dbm backends may add suffixes like .db or .dat to the actual files
+            for suffix in ('', '.db', '.dat', '.dir', '.bak'):
+                name = self.db + suffix
+                if os.path.exists(name):
+                    os.replace(name, f'{name}.corrupt')
+            return None
 
     def save_state(self):
         logger.debug("Saving state to '%s'...", self.db)

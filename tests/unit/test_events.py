@@ -1,8 +1,10 @@
 import asyncio
+import dbm
+import dbm.dumb
 import os
 import shelve
 import tempfile
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from kombu.exceptions import OperationalError
 from tornado.testing import AsyncTestCase, gen_test
@@ -68,6 +70,56 @@ class PersistenceTests(AsyncTestCase):
 
             leftovers = [f for f in os.listdir(tmpdir) if '.tmp' in f]
             self.assertEqual([], leftovers)
+
+    def test_recovers_from_corrupt_db(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            with open(db, 'wb') as f:
+                f.write(b'garbage' * 100)
+
+            with self.assertLogs('flower.events', level='ERROR'):
+                events = self.events(db)
+
+            self.assertEqual({}, dict(events.state.counter))
+            self.assertTrue(os.path.exists(db + '.corrupt'))
+
+            events.state.counter['worker1']['task-received'] = 7
+            events.save_state()
+            restored = self.events(db)
+            self.assertEqual(
+                7, restored.state.counter['worker1']['task-received'])
+
+    def test_save_state_with_suffixed_db_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            with patch.object(dbm, '_defaultmod', dbm.dumb):
+                events = self.events(db)
+                events.state.counter['worker1']['task-received'] = 3
+                events.save_state()
+
+                self.assertTrue(os.path.exists(db + '.dat'))
+                self.assertFalse(os.path.exists(db))
+                leftovers = [f for f in os.listdir(tmpdir) if '.tmp' in f]
+                self.assertEqual([], leftovers)
+
+                restored = self.events(db)
+                self.assertEqual(
+                    3, restored.state.counter['worker1']['task-received'])
+
+    def test_recovers_from_corrupt_suffixed_db(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            for suffix in ('.dat', '.dir'):
+                with open(db + suffix, 'wb') as f:
+                    f.write(b'garbage' * 100)
+
+            with patch.object(dbm, '_defaultmod', dbm.dumb):
+                with self.assertLogs('flower.events', level='ERROR'):
+                    events = self.events(db)
+
+                self.assertEqual({}, dict(events.state.counter))
+                self.assertTrue(os.path.exists(db + '.dat.corrupt'))
+                self.assertTrue(os.path.exists(db + '.dir.corrupt'))
 
     def test_loads_database_without_persisted_counters(self):
         with tempfile.TemporaryDirectory() as tmpdir:
