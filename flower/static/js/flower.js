@@ -791,7 +791,8 @@ var flower = (function () {
             processing: true,
             serverSide: true,
             colReorder: true,
-            lengthChange: false,
+            dom: "frt<'dt-footer'lip>",
+            lengthMenu: [15, 30, 50, 100],
             pageLength: 15,
             stateSave: true,
             stateLoadParams: function (settings, data) {
@@ -799,8 +800,11 @@ var flower = (function () {
                     data.search.search = 'state:' + initialState;
                 }
             },
+            initComplete: function () {
+                $('#tasks-table_length select').attr('aria-label', 'Tasks per page');
+            },
             language: {
-                lengthMenu: 'Show _MENU_ tasks',
+                lengthMenu: '_MENU_',
                 info: 'Showing _START_ to _END_ of _TOTAL_ tasks',
                 infoEmpty: 'No tasks to show',
                 infoFiltered: '(filtered from _MAX_ total tasks)',
