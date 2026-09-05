@@ -27,8 +27,8 @@ class BaseApiHandler(BaseHandler):
 
     def write_error(self, status_code, **kwargs):
         exc_info = kwargs.get('exc_info')
-        log_message = exc_info[1].log_message
+        log_message = getattr(exc_info[1], 'log_message', None) if exc_info else None
         if log_message:
+            self.set_header('Content-Type', 'text/plain; charset=UTF-8')
             self.write(log_message)
-        self.set_status(status_code)
         self.finish()

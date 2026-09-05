@@ -18,6 +18,14 @@ class UnknownWorkerControlTests(BaseApiTestCase):
         r = self.post('/api/worker/shutdown/test', body={})
         self.assertEqual(404, r.code)
 
+    def test_unknown_worker_error_is_not_html(self):
+        r = self.post(
+            '/api/worker/shutdown/%3Cimg%20src%3Dx%20onerror%3Dalert(1)%3E',
+            body={})
+        self.assertEqual(404, r.code)
+        self.assertTrue(r.headers['Content-Type'].startswith('text/plain'))
+        self.assertIn(b'<img src=x onerror=alert(1)>', r.body)
+
 
 class WorkerControlTests(BaseApiTestCase):
     def setUp(self):
