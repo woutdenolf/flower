@@ -13,7 +13,6 @@ from tornado.escape import json_decode
 from tornado.web import HTTPError
 
 from ..utils import tasks
-from ..utils.broker import Broker
 from ..utils.search import QuerySyntaxError
 from . import BaseApiHandler
 
@@ -453,20 +452,7 @@ Return length of all active queues
 :statuscode 401: unauthorized request
 :statuscode 404: broker is not supported
         """
-        app = self.application
-
-        http_api = None
-        if app.transport == 'amqp' and app.options.broker_api:
-            http_api = app.options.broker_api
-
-        try:
-            broker = Broker(app.broker_uri_with_password,
-                            http_api=http_api, broker_options=self.capp.conf.broker_transport_options,
-                            broker_use_ssl=self.capp.conf.broker_use_ssl)
-        except NotImplementedError as exc:
-            raise HTTPError(
-                404, f"'{app.transport}' broker is not supported") from exc
-
+        broker = self.get_broker()
         queues = await broker.queues(self.get_active_queue_names())
         self.write({'active_queues': queues})
 

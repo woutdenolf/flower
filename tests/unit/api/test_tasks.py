@@ -228,7 +228,7 @@ class TaskResultInvalidTimeoutTests(BaseApiTestCase):
 
 
 class QueueLengthsTests(BaseApiTestCase):
-    @patch('flower.api.tasks.Broker', side_effect=NotImplementedError)
+    @patch('flower.views.Broker', side_effect=NotImplementedError)
     def test_unsupported_broker(self, _broker):
         r = self.get('/api/queues/length')
 

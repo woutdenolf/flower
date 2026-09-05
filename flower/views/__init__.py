@@ -13,6 +13,7 @@ import tornado.auth
 
 from ..utils import template, bugreport, strtobool
 from ..utils.authentication import authenticate
+from ..utils.broker import Broker
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,19 @@ class BaseHandler(tornado.web.RequestHandler):
             except Exception:
                 logger.exception("Failed to format '%s' task", task.uuid)
         return task
+
+    def get_broker(self):
+        app = self.application
+        http_api = None
+        if app.transport == 'amqp' and app.options.broker_api:
+            http_api = app.options.broker_api
+        try:
+            return Broker(app.broker_uri_with_password, http_api=http_api,
+                          broker_options=self.capp.conf.broker_transport_options,
+                          broker_use_ssl=self.capp.conf.broker_use_ssl)
+        except NotImplementedError as exc:
+            raise tornado.web.HTTPError(
+                404, f"'{app.transport}' broker is not supported") from exc
 
     def get_active_queue_names(self):
         queues = set([])
