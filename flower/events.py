@@ -273,7 +273,7 @@ class Events(threading.Thread):
         if self.state_save_timer and elapsed > interval_seconds / 10:
             logger.warning(
                 "Saving state took %.1fs, consider increasing "
-                "--state_save_interval or decreasing --max_tasks", elapsed)
+                "--state-save-interval or decreasing --max-tasks", elapsed)
 
     async def on_enable_events(self):
         # Periodically enable events for workers

@@ -135,7 +135,7 @@ class PersistenceTests(AsyncTestCase):
                         events.save_state()
 
             self.assertEqual(3, len(logs.output))
-            self.assertIn('state_save_interval', logs.output[0])
+            self.assertIn('--state-save-interval', logs.output[0])
 
     def test_no_warning_for_fast_saves(self):
         with tempfile.TemporaryDirectory() as tmpdir:

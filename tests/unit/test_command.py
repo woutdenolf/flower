@@ -17,7 +17,7 @@ from tests.unit import AsyncHTTPTestCase
 
 class TestFlowerCommand(AsyncHTTPTestCase):
     def test_task_runtime_metric_buckets_read_from_cmd_line(self):
-        apply_options('flower', argv=['--task_runtime_metric_buckets=1,10,inf'])
+        apply_options('flower', argv=['--task-runtime-metric-buckets=1,10,inf'])
         self.assertEqual([1.0, 10.0, float('inf')], options.task_runtime_metric_buckets)
 
     def test_task_runtime_metric_buckets_no_cmd_line_arg(self):

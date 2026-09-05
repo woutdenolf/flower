@@ -155,7 +155,7 @@ def extract_settings():
         try:
             validate_broker_api(options.broker_api)
         except ValueError as exc:
-            logger.error("Invalid '--broker_api' option: %s", exc)
+            logger.error("Invalid '--broker-api' option: %s", exc)
             sys.exit(1)
 
 
