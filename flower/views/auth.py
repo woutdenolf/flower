@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import uuid
 from urllib.parse import urlencode, urlparse
 
@@ -10,6 +9,7 @@ import tornado.web
 from celery.utils.imports import instantiate
 from tornado.options import options
 
+from ..utils.authentication import authenticate
 from ..views import BaseHandler
 from ..views.error import NotFoundErrorHandler
 
@@ -33,25 +33,6 @@ def get_next_url(handler):
     if url_prefix and next_ and next_[0] != '/':
         next_ = '/' + next_
     return next_ if is_safe_redirect(next_) else default
-
-
-def authenticate(pattern, email):
-    if '|' in pattern:
-        return email in pattern.split('|')
-    if '*' in pattern:
-        pattern = re.escape(pattern).replace(r'\.\*', r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~.\-]*")
-        return re.fullmatch(pattern, email)
-    return pattern == email
-
-
-def validate_auth_option(pattern):
-    if pattern.count('*') > 1:
-        return False
-    if '*' in pattern and '|' in pattern:
-        return False
-    if '*' in pattern.rsplit('@', 1)[-1]:
-        return False
-    return True
 
 
 class OAuth2StateMixin:

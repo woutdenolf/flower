@@ -1,4 +1,3 @@
-import re
 import inspect
 import traceback
 import copy
@@ -10,6 +9,7 @@ from base64 import b64decode
 import tornado
 
 from ..utils import template, bugreport, strtobool
+from ..utils.authentication import authenticate
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ class BaseHandler(tornado.web.RequestHandler):
         if user:
             if not isinstance(user, str):
                 user = user.decode()
-            if re.match(self.application.options.auth, user):
+            if authenticate(self.application.options.auth, user):
                 return user
         return None
 

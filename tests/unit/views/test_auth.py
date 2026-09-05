@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import tornado.auth
 
-from flower.views.auth import (OAuth2StateMixin, authenticate, get_next_url,
-                               is_safe_redirect, validate_auth_option)
+from flower.utils.authentication import authenticate, validate_auth_option
+from flower.views.auth import OAuth2StateMixin, get_next_url, is_safe_redirect
 from tests.unit import AsyncHTTPTestCase
 
 
