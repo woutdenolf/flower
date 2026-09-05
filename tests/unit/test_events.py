@@ -4,18 +4,21 @@ import dbm.dumb
 import os
 import shelve
 import tempfile
+import time
 from unittest.mock import Mock, patch
 
 from kombu.exceptions import OperationalError
 from tornado.testing import AsyncTestCase, gen_test
 
 from flower.events import Events
+from tests.unit.utils import task_succeeded_events
 
 
 class PersistenceTests(AsyncTestCase):
-    def events(self, db, **kwargs):
+    def events(self, db, max_tasks_in_memory=10, **kwargs):
         return Events(Mock(), self.io_loop, db=db, persistent=True,
-                      enable_events=False, **kwargs)
+                      enable_events=False,
+                      max_tasks_in_memory=max_tasks_in_memory, **kwargs)
 
     def test_recovers_counters_and_continues_counting(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -151,6 +154,38 @@ class PersistenceTests(AsyncTestCase):
             with patch('flower.events.time.time', side_effect=[0, 60]):
                 with self.assertNoLogs('flower.events', level='WARNING'):
                     events.save_state()
+
+    def receive_tasks(self, events, count):
+        for _ in range(count):
+            for event in task_succeeded_events('worker1'):
+                event['clock'] = len(events.state.tasks)
+                event['local_received'] = time.time()
+                events.state.event(event)
+
+    def test_raises_task_limit_on_restore(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db, max_tasks_in_memory=2)
+            self.receive_tasks(events, 2)
+            events.save_state()
+
+            restored = self.events(db, max_tasks_in_memory=4)
+            self.receive_tasks(restored, 2)
+
+            self.assertEqual(4, len(restored.state.tasks))
+
+    def test_shrinks_task_limit_on_restore(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db = os.path.join(tmpdir, 'flower')
+            events = self.events(db, max_tasks_in_memory=4)
+            self.receive_tasks(events, 4)
+            events.save_state()
+
+            restored = self.events(db, max_tasks_in_memory=2)
+
+            self.assertEqual(2, len(restored.state.tasks))
+            self.receive_tasks(restored, 1)
+            self.assertEqual(2, len(restored.state.tasks))
 
     def test_loads_database_without_persisted_counters(self):
         with tempfile.TemporaryDirectory() as tmpdir:

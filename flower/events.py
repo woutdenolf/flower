@@ -164,7 +164,7 @@ class Events(threading.Thread):
     # pylint: disable=too-many-arguments
     def __init__(self, capp, io_loop, db=None, persistent=False,
                  enable_events=True, state_save_interval=0,
-                 **kwargs):
+                 *, max_tasks_in_memory, **kwargs):
         threading.Thread.__init__(self)
         self.daemon = True
 
@@ -180,13 +180,17 @@ class Events(threading.Thread):
 
         if self.persistent:
             self.state = self.load_state()
+            if self.state:
+                # A restored state keeps the limit it was saved with
+                self.state.max_tasks_in_memory = self.state.tasks.limit = max_tasks_in_memory
+                self.state.tasks.update()
 
             if state_save_interval:
                 self.state_save_timer = PeriodicCallback(self.save_state,
                                                          state_save_interval)
 
         if not self.state:
-            self.state = EventsState(**kwargs)
+            self.state = EventsState(max_tasks_in_memory=max_tasks_in_memory, **kwargs)
 
         self.timer = PeriodicCallback(self.on_enable_events,
                                       self.events_enable_interval)
