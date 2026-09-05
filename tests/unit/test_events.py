@@ -131,7 +131,7 @@ class PersistenceTests(AsyncTestCase):
 
             with self.assertLogs('flower.events', level='WARNING') as logs:
                 for _ in range(3):
-                    with patch('flower.events.time.time', side_effect=[0, 60]):
+                    with patch('flower.events.time.monotonic', side_effect=[0, 60]):
                         events.save_state()
 
             self.assertEqual(3, len(logs.output))
@@ -142,7 +142,7 @@ class PersistenceTests(AsyncTestCase):
             db = os.path.join(tmpdir, 'flower')
             events = self.events(db, state_save_interval=1000)
 
-            with patch('flower.events.time.time', side_effect=[0, 0.01]):
+            with patch('flower.events.time.monotonic', side_effect=[0, 0.01]):
                 with self.assertNoLogs('flower.events', level='WARNING'):
                     events.save_state()
 
@@ -151,7 +151,7 @@ class PersistenceTests(AsyncTestCase):
             db = os.path.join(tmpdir, 'flower')
             events = self.events(db)
 
-            with patch('flower.events.time.time', side_effect=[0, 60]):
+            with patch('flower.events.time.monotonic', side_effect=[0, 60]):
                 with self.assertNoLogs('flower.events', level='WARNING'):
                     events.save_state()
 

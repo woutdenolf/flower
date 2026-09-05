@@ -256,7 +256,7 @@ class Events(threading.Thread):
 
     def save_state(self):
         logger.debug("Saving state to '%s'...", self.db)
-        started = time.time()
+        started = time.monotonic()
         tmp = f'{self.db}.tmp'
         state = shelve.open(tmp, flag='n')
         try:
@@ -268,7 +268,7 @@ class Events(threading.Thread):
         for name in glob.glob(glob.escape(tmp) + '*'):
             os.replace(name, self.db + name[len(tmp):])
 
-        elapsed = time.time() - started
+        elapsed = time.monotonic() - started
         interval_seconds = self.state_save_interval / 1000
         if self.state_save_timer and elapsed > interval_seconds / 10:
             logger.warning(
