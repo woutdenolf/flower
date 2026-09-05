@@ -9,8 +9,20 @@ var flower = (function () {
     document.querySelectorAll('[data-flower-tooltip]').forEach(function (element) {
         var tooltip = bootstrap.Tooltip.getOrCreateInstance(element);
 
+        element.addEventListener('show.bs.tooltip', function () {
+            document.querySelectorAll('[data-flower-tooltip]').forEach(function (other) {
+                if (other !== element) {
+                    bootstrap.Tooltip.getInstance(other).hide();
+                }
+            });
+        });
+
         element.addEventListener('show.bs.dropdown', function () {
             tooltip.hide();
+            tooltip.disable();
+        });
+        element.addEventListener('hidden.bs.dropdown', function () {
+            tooltip.enable();
         });
     });
 
