@@ -7,6 +7,7 @@ import hmac
 from base64 import b64decode
 
 import tornado
+import tornado.auth
 
 from ..utils import template, bugreport, strtobool
 from ..utils.authentication import authenticate
@@ -45,10 +46,24 @@ class BaseHandler(tornado.web.RequestHandler):
             return
         super().check_xsrf_cookie()
 
+    def log_exception(self, typ, value, tb):
+        # OAuth failures are user errors, not server faults
+        if isinstance(value, tornado.auth.AuthError):
+            logger.warning("Authentication error: %s", value)
+            return
+        super().log_exception(typ, value, tb)
+
     def write_error(self, status_code, **kwargs):
         # Avoid re-running authentication while rendering an error response
         if not hasattr(self, '_current_user'):
             self.current_user = None
+
+        exc_info = kwargs.get('exc_info')
+        if exc_info and isinstance(exc_info[1], tornado.auth.AuthError):
+            self.set_status(403)
+            self.render('404.html',
+                        message=f'{exc_info[1]}. Please try logging in again.')
+            return
 
         if status_code in (404, 403):
             message = ''
