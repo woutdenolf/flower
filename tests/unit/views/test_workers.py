@@ -1,7 +1,6 @@
 import asyncio
 import json
 import time
-import unittest
 from unittest.mock import patch
 
 from celery.events import Event
@@ -32,7 +31,6 @@ class WorkersTests(AsyncHTTPTestCase):
         self.assertIn('Load Average', str(r.body))
         self.assertNotIn('<tr id=', str(r.body))
 
-    @unittest.skip('disable temporarily')
     def test_unknown_worker(self):
         with self.mock_option("inspect_timeout", 1.0):
             r = self.get('/worker/unknown')
