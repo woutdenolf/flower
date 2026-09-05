@@ -64,11 +64,10 @@ OPTIONS
   --enable-events                  periodically enable Celery events (default *True*)
   --format-task                    use custom task formatter
   --help                           show this help information
-  --inspect                        inspect workers (default *True*)
   --inspect-timeout                inspect timeout (in milliseconds) (default
                                    *1000*)
   --keyfile                        path to SSL key file
-  --max-workers                     maximum number of workers to keep in memory
+  --max-workers                    maximum number of workers to keep in memory
                                    (default *5000*)
   --max-tasks                      maximum number of tasks to keep in memory
                                    (default *100000*)
