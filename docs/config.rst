@@ -6,6 +6,9 @@ Configuration
 Flower is highly customizable. You can pass configuration options through the command line,
 configuration file, or environment variables. For a full list of options, see the `Option Reference`_ section.
 
+When the same option is set in more than one place, the command line takes precedence
+over the configuration file, which takes precedence over environment variables.
+
 Command line
 ------------
 
