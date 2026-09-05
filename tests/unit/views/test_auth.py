@@ -1,5 +1,17 @@
-from flower.views.auth import authenticate, validate_auth_option
+from types import SimpleNamespace
+
+from flower.views.auth import (authenticate, get_next_url, is_safe_redirect,
+                               validate_auth_option)
 from tests.unit import AsyncHTTPTestCase
+
+
+def _handler(next_value, url_prefix=''):
+    options = SimpleNamespace(url_prefix=url_prefix)
+    return SimpleNamespace(
+        application=SimpleNamespace(options=options),
+        get_argument=lambda name, default: (
+            default if next_value is None else next_value),
+    )
 
 
 class BasicAuthTests(AsyncHTTPTestCase):
@@ -52,6 +64,29 @@ class AuthTests(AsyncHTTPTestCase):
         self.assertFalse(authenticate("one@example.com|two@example.net", "mail@gmail.com"))
         self.assertFalse(authenticate("one@example.com|two@example.net", ""))
         self.assertFalse(authenticate("one@example.com|two@example.net", "*"))
+
+    def test_is_safe_redirect(self):
+        self.assertTrue(is_safe_redirect('/'))
+        self.assertTrue(is_safe_redirect('/workers'))
+        self.assertTrue(is_safe_redirect('/tasks?state=SUCCESS'))
+        self.assertFalse(is_safe_redirect(''))
+        self.assertFalse(is_safe_redirect('workers'))
+        self.assertFalse(is_safe_redirect('//evil.com'))
+        self.assertFalse(is_safe_redirect('/\\evil.com'))
+        self.assertFalse(is_safe_redirect('https://evil.com'))
+        self.assertFalse(is_safe_redirect('http:evil.com'))
+
+    def test_get_next_url_rejects_open_redirects(self):
+        self.assertEqual('/', get_next_url(_handler('//evil.com')))
+        self.assertEqual('/', get_next_url(_handler('https://evil.com')))
+        self.assertEqual('/flower', get_next_url(_handler('//evil.com', 'flower')))
+
+    def test_get_next_url_allows_local_paths(self):
+        self.assertEqual('/tasks', get_next_url(_handler('/tasks')))
+        self.assertEqual('/', get_next_url(_handler(None)))
+        self.assertEqual('/flower', get_next_url(_handler(None, 'flower')))
+        # a bare path is normalized under the prefix, matching prior behavior
+        self.assertEqual('/workers', get_next_url(_handler('workers', 'flower')))
 
     def test_authenticate_wildcard_email(self):
         self.assertTrue(authenticate(".*@example.com", "one@example.com"))

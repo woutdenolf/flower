@@ -2,7 +2,7 @@ import json
 import os
 import re
 import uuid
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import tornado.auth
 import tornado.gen
@@ -14,6 +14,25 @@ from ..views import BaseHandler
 from ..views.error import NotFoundErrorHandler
 
 # pylint: disable=invalid-name
+
+
+def is_safe_redirect(target):
+    "check if target is a same-origin local path"
+    if not target or not target.startswith('/'):
+        return False
+    if target.startswith('//') or target.startswith('/\\'):
+        return False
+    parsed = urlparse(target)
+    return not parsed.scheme and not parsed.netloc
+
+
+def get_next_url(handler):
+    url_prefix = handler.application.options.url_prefix
+    default = '/' + url_prefix.strip('/') if url_prefix else '/'
+    next_ = handler.get_argument('next', default)
+    if url_prefix and next_ and next_[0] != '/':
+        next_ = '/' + next_
+    return next_ if is_safe_redirect(next_) else default
 
 
 def authenticate(pattern, email):
@@ -74,11 +93,7 @@ class GoogleAuth2LoginHandler(BaseHandler, tornado.auth.GoogleOAuth2Mixin):
 
         self.set_secure_cookie("user", str(email))
 
-        next_ = self.get_argument('next', self.application.options.url_prefix or '/')
-        if self.application.options.url_prefix and next_[0] != '/':
-            next_ = '/' + next_
-
-        self.redirect(next_)
+        self.redirect(get_next_url(self))
 
 
 class LoginHandler(BaseHandler):
@@ -162,10 +177,7 @@ class GithubLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
 
         self.set_secure_cookie("user", str(emails.pop()))
 
-        next_ = self.get_argument('next', self.application.options.url_prefix or '/')
-        if self.application.options.url_prefix and next_[0] != '/':
-            next_ = '/' + next_
-        self.redirect(next_)
+        self.redirect(get_next_url(self))
 
 
 class GitLabLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
@@ -254,10 +266,7 @@ class GitLabLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
             raise tornado.web.HTTPError(403, message)
 
         self.set_secure_cookie('user', str(user_email))
-        next_ = self.get_argument('next', self.application.options.url_prefix or '/')
-        if self.application.options.url_prefix and next_[0] != '/':
-            next_ = '/' + next_
-        self.redirect(next_)
+        self.redirect(get_next_url(self))
 
 
 class OktaLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
@@ -353,7 +362,4 @@ class OktaLoginHandler(BaseHandler, tornado.auth.OAuth2Mixin):
         self.set_secure_cookie("user", str(email))
         self.clear_cookie('oauth_state')
 
-        next_ = self.get_argument('next', self.application.options.url_prefix or '/')
-        if self.application.options.url_prefix and next_[0] != '/':
-            next_ = '/' + next_
-        self.redirect(next_)
+        self.redirect(get_next_url(self))
