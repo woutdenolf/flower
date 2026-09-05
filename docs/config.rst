@@ -152,7 +152,7 @@ The `broker_api` option should be set to the URL of the RabbitMQ HTTP API, inclu
 
 Example::
 
-    $ celery flower broker-api="http://username:password@rabbitmq-server-name:15672/api/"
+    $ celery flower --broker-api="http://username:password@rabbitmq-server-name:15672/api/"
 
 .. Note:: By default, the RabbitMQ Management Plugin is not enabled. To enable it, run the following command::
 
