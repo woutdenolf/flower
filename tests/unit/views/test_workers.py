@@ -78,6 +78,26 @@ class WorkersTests(AsyncHTTPTestCase):
         self.assertEqual(200, r.code)
         self.assertEqual(0, len(table.rows()))
 
+    def test_purge_offline_workers_grace_period(self):
+        state = EventsState()
+        state.get_or_create_worker('worker1')
+        state.event(Event('worker-online', hostname='worker1',
+                          local_received=time.time()))
+        state.event(Event('worker-offline', hostname='worker1',
+                          local_received=time.time()))
+        self.app.events.state = state
+
+        with patch('flower.views.workers.options') as mock_options:
+            mock_options.purge_offline_workers = 120
+            r = self.get('/workers')
+
+        table = HtmlTableParser()
+        table.parse(str(r.body))
+
+        self.assertEqual(200, r.code)
+        self.assertEqual(1, len(table.rows()))
+        self.assertTrue(table.get_row('worker1'))
+
     def test_single_workers_online(self):
         state = EventsState()
         state.get_or_create_worker('worker1')

@@ -67,8 +67,9 @@ class WorkersView(BaseHandler):
                     continue
 
                 heartbeats = info.get('heartbeats', [])
-                last_heartbeat = int(max(heartbeats)) if heartbeats else None
-                if not last_heartbeat or timestamp - last_heartbeat > options.purge_offline_workers:
+                last_seen = max(heartbeats) if heartbeats else \
+                    getattr(events.workers[name], 'timestamp', None)
+                if not last_seen or timestamp - int(last_seen) >= options.purge_offline_workers:
                     offline_workers.append(name)
 
             for name in offline_workers:
