@@ -59,7 +59,7 @@ handlers = [
     (r"/static/(.*)", StaticFileHandler,
      {"path": settings['static_path']}),
     # Auth
-    (r"/login", auth.LoginHandler),
+    (r"/login/?", auth.LoginHandler),
 
     # Error
     (r".*", NotFoundErrorHandler),

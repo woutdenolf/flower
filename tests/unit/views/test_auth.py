@@ -3,8 +3,24 @@ from types import SimpleNamespace
 import tornado.auth
 
 from flower.utils.authentication import authenticate, validate_auth_option
+from flower.views import BaseHandler
 from flower.views.auth import OAuth2StateMixin, get_next_url, is_safe_redirect
 from tests.unit import AsyncHTTPTestCase
+
+
+class DummyLoginHandler(BaseHandler):
+    def get(self):
+        self.write('login page')
+
+
+class LoginRouteTests(AsyncHTTPTestCase):
+    def test_login_trailing_slash(self):
+        provider = f'{DummyLoginHandler.__module__}.DummyLoginHandler'
+        with self.mock_option('auth_provider', provider):
+            r = self.fetch('/login')
+            self.assertEqual(200, r.code)
+            r = self.fetch('/login/')
+            self.assertEqual(200, r.code)
 
 
 class _StateHandler(OAuth2StateMixin):
