@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 import unittest
@@ -311,6 +312,21 @@ class WorkersTests(AsyncHTTPTestCase):
             res = self.get('/workers?refresh=1')
             self.assertEqual(200, res.code)
             update_workers_mock.assert_called()
+
+    def test_worker_page_waits_for_inspection(self):
+        stats = {'total': {'tasks.add': 10},
+                 'broker': {'hostname': 'redis', 'userid': None,
+                            'virtual_host': '/', 'port': 6379}}
+
+        async def populate(workername=None):
+            self.app.inspector.workers[workername]['stats'] = stats
+
+        def inspect(workername=None):
+            return asyncio.ensure_future(populate(workername))
+
+        with patch.object(self.get_app(), "update_workers", side_effect=inspect):
+            res = self.get('/worker/worker1')
+            self.assertEqual(200, res.code)
 
     def test_workers_page(self):
         state = EventsState()

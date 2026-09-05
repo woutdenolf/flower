@@ -13,7 +13,11 @@ class WorkerView(BaseHandler):
     @web.authenticated
     async def get(self, name):
         try:
-            self.application.update_workers(workername=name)
+            update = self.application.update_workers(workername=name)
+            # wait for inspection only when nothing is cached yet
+            # cached workers render immediately and refresh in the background
+            if 'stats' not in self.application.workers.get(name, {}):
+                await update
         except Exception as e:
             logger.error(e)
 
